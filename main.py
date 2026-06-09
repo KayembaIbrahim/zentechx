@@ -413,8 +413,24 @@ class Strategy:
         return df
 
 
+    # ── Window helper: check if condition was true in last N bars ──
+    @classmethod
+    def _check_window(cls, df, lookback, check_fn):
+        """Check if check_fn(prev_row, row) returns True in the last `lookback` bars."""
+        for i in range(-lookback, 0):
+            if abs(i) >= len(df): continue
+            try:
+                prev = df.iloc[i-1]
+                row = df.iloc[i]
+                result = check_fn(prev, row)
+                if result:
+                    return result, row
+            except: continue
+        return None, None
+
+
 class CandyStrategy(Strategy):
-    """🍬 Candy Strategy — Trend following with EMA crossover + RSI filter."""
+    """🍬 Candy — Trend following: EMA position + RSI filter."""
     name = "Candy"
     
     @classmethod
@@ -424,80 +440,89 @@ class CandyStrategy(Strategy):
         if len(df) < 30: return None
         
         last = df.iloc[-1]
-        prev = df.iloc[-2]
         
-        # EMA crossover
-        bullish_cross = prev["ema12"] <= prev["ema26"] and last["ema12"] > last["ema26"]
-        bearish_cross = prev["ema12"] >= prev["ema26"] and last["ema12"] < last["ema26"]
+        # EMA position tells us the trend direction
+        ema_bull = last["ema12"] > last["ema26"]
+        ema_bear = last["ema12"] < last["ema26"]
         
-        # RSI filter
-        rsi_ok = 30 < last["rsi"] < 70
+        # RSI filter avoids overbought/oversold entries
+        rsi_ok = 25 < last["rsi"] < 75
         
-        # Trend strength (ADX proxy via MACD)
-        trend_strong = abs(last["macd"] - last["macd_signal"]) > 0.0001
+        # Check for recent EMA crossover (bonus confidence)
+        def ema_cross_bull(p, r):
+            return p["ema12"] <= p["ema26"] and r["ema12"] > r["ema26"]
+        def ema_cross_bear(p, r):
+            return p["ema12"] >= p["ema26"] and r["ema12"] < r["ema26"]
+        cross_bull, _ = cls._check_window(df, 10, ema_cross_bull)
+        cross_bear, _ = cls._check_window(df, 10, ema_cross_bear)
         
-        if bullish_cross and rsi_ok and trend_strong:
+        if ema_bull and rsi_ok:
             price = last["close"]
             atr = max(last["atr"], 0.0005)
             sl = price - atr * 2.0
             tp = price + atr * 3.0
-            conf = min(95, 50 + (70 - last["rsi"]) / 70 * 30 + (10 if trend_strong else 0))
+            bonus = 15 if cross_bull else 0
+            conf = min(92, 50 + (70 - last["rsi"]) / 70 * 30 + bonus)
             return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
                     "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Candy", "reason": "EMA bullish cross + RSI healthy"}
+                    "strategy": "Candy", "reason": "Bullish EMA trend + RSI healthy"}
         
-        if bearish_cross and rsi_ok and trend_strong:
+        if ema_bear and rsi_ok:
             price = last["close"]
             atr = max(last["atr"], 0.0005)
             sl = price + atr * 2.0
             tp = price - atr * 3.0
-            conf = min(95, 50 + (last["rsi"] - 30) / 70 * 30 + (10 if trend_strong else 0))
+            bonus = 15 if cross_bear else 0
+            conf = min(92, 50 + (last["rsi"] - 30) / 70 * 30 + bonus)
             return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
                     "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Candy", "reason": "EMA bearish cross + RSI healthy"}
+                    "strategy": "Candy", "reason": "Bearish EMA trend + RSI healthy"}
         
         return None
 
 
 class ScalpStrategy(Strategy):
-    """⚡ Scalping — Short-term momentum with Stochastic + Bollinger Bands."""
+    """⚡ Scalp — Short-term momentum: Stochastic extremes + BB / EMA bounce."""
     name = "Scalp"
     
     @classmethod
     def analyze(cls, symbol):
-        df = MarketGenerator.get_rates(symbol, 30)
+        df = MarketGenerator.get_rates(symbol, 40)
         df = cls.indicators(df)
         if len(df) < 20: return None
         
-        last = df.iloc[-1]
-        
-        # Oversold bounce
-        if last["stoch_k"] < 20 and last["stoch_d"] < 20 and last["close"] < last["bb_lower"]:
-            price = last["close"]
-            atr = max(last["atr"], 0.0003)
-            sl = price - atr * 1.2
-            tp = price + atr * 2.0
-            conf = min(90, 60 + (20 - last["stoch_k"]) * 1.5)
-            return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Scalp", "reason": "Oversold bounce (Stoch < 20 + BB low)"}
-        
-        # Overbought sell
-        if last["stoch_k"] > 80 and last["stoch_d"] > 80 and last["close"] > last["bb_upper"]:
-            price = last["close"]
-            atr = max(last["atr"], 0.0003)
-            sl = price + atr * 1.2
-            tp = price - atr * 2.0
-            conf = min(90, 60 + (last["stoch_k"] - 80) * 1.5)
-            return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Scalp", "reason": "Overbought (Stoch > 80 + BB high)"}
+        # Check last 5 bars for scalp opportunities
+        for i in range(-5, 0):
+            if abs(i) >= len(df): continue
+            row = df.iloc[i]
+            
+            # Oversold: Stoch < 25 + price near/lower BB
+            if row["stoch_k"] < 25 and row["stoch_d"] < 25 and row["close"] <= row["bb_mid"]:
+                price = row["close"]
+                atr = max(row["atr"], 0.0003)
+                sl = price - atr * 1.3
+                tp = price + atr * 2.2
+                conf = min(88, 55 + (25 - row["stoch_k"]) * 1.3)
+                return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "Scalp", "reason": f"Oversold (Stoch K={row['stoch_k']:.0f})"}
+            
+            # Overbought: Stoch > 75 + price near/above BB
+            if row["stoch_k"] > 75 and row["stoch_d"] > 75 and row["close"] >= row["bb_mid"]:
+                price = row["close"]
+                atr = max(row["atr"], 0.0003)
+                sl = price + atr * 1.3
+                tp = price - atr * 2.2
+                conf = min(88, 55 + (row["stoch_k"] - 75) * 1.3)
+                return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "Scalp", "reason": f"Overbought (Stoch K={row['stoch_k']:.0f})"}
         
         return None
 
 
 class TrendStrategy(Strategy):
-    """📈 Trend Strategy — Strong directional moves with MACD confirmation."""
+    """📈 Trend — Strong directional moves: price vs SMA + MACD power."""
     name = "Trend"
     
     @classmethod
@@ -507,44 +532,44 @@ class TrendStrategy(Strategy):
         if len(df) < 40: return None
         
         last = df.iloc[-1]
-        prev = df.iloc[-2]
         
-        # Trend direction (price above/below SMA50)
+        # Trend via SMA structure
         uptrend = last["close"] > last["sma50"] and last["sma20"] > last["sma50"]
         downtrend = last["close"] < last["sma50"] and last["sma20"] < last["sma50"]
         
-        # MACD confirmation
-        macd_bull = last["macd"] > last["macd_signal"] and prev["macd"] <= prev["macd_signal"]
-        macd_bear = last["macd"] < last["macd_signal"] and prev["macd"] >= prev["macd_signal"]
+        # RSI momentum confirms trend
+        rsi_bull = last["rsi"] > 50
+        rsi_bear = last["rsi"] < 50
         
-        # RSI momentum
-        rsi_momentum = last["rsi"] > 50
+        # MACD position (optional, for confidence boost)
+        macd_bull = last["macd"] > last["macd_signal"]
+        macd_bear = last["macd"] < last["macd_signal"]
         
-        if uptrend and macd_bull and rsi_momentum:
+        if uptrend and rsi_bull:
             price = last["close"]
             atr = max(last["atr"], 0.0005)
             sl = price - atr * 2.5
             tp = price + atr * 4.0
-            conf = min(92, 55 + (last["rsi"] - 50) * 0.7 + (15 if macd_bull else 0))
+            conf = min(90, 55 + (last["rsi"] - 50) * 0.6 + (10 if macd_bull else 0))
             return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
                     "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Trend", "reason": "Uptrend + MACD bullish crossover"}
+                    "strategy": "Trend", "reason": "Uptrend + RSI momentum"}
         
-        if downtrend and macd_bear and not rsi_momentum:
+        if downtrend and rsi_bear:
             price = last["close"]
             atr = max(last["atr"], 0.0005)
             sl = price + atr * 2.5
             tp = price - atr * 4.0
-            conf = min(92, 55 + (50 - last["rsi"]) * 0.7 + (15 if macd_bear else 0))
+            conf = min(90, 55 + (50 - last["rsi"]) * 0.6 + (10 if macd_bear else 0))
             return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
                     "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Trend", "reason": "Downtrend + MACD bearish crossover"}
+                    "strategy": "Trend", "reason": "Downtrend + RSI momentum"}
         
         return None
 
 
 class MeanRevStrategy(Strategy):
-    """🔄 Mean Reversion — RSI extremes + Bollinger Band touches."""
+    """🔄 Mean Reversion — RSI extremes near Bollinger Bands (wider window)."""
     name = "MeanRev"
     
     @classmethod
@@ -553,34 +578,38 @@ class MeanRevStrategy(Strategy):
         df = cls.indicators(df)
         if len(df) < 20: return None
         
-        last = df.iloc[-1]
-        
-        # Extreme RSI + BB touch
-        if last["rsi"] < 28 and last["close"] <= last["bb_lower"]:
-            price = last["close"]
-            atr = max(last["atr"], 0.0004)
-            sl = price - atr * 1.8
-            tp = last["bb_mid"] + atr * 0.5  # revert to mean + buffer
-            conf = min(85, 70 + (28 - last["rsi"]) * 1.2)
-            return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "MeanRev", "reason": f"RSI {last['rsi']:.0f} extreme + BB touch"}
-        
-        if last["rsi"] > 72 and last["close"] >= last["bb_upper"]:
-            price = last["close"]
-            atr = max(last["atr"], 0.0004)
-            sl = price + atr * 1.8
-            tp = last["bb_mid"] - atr * 0.5
-            conf = min(85, 70 + (last["rsi"] - 72) * 1.2)
-            return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "MeanRev", "reason": f"RSI {last['rsi']:.0f} extreme + BB touch"}
+        # Check last 5 bars for reversion opportunities
+        for i in range(-5, 0):
+            if abs(i) >= len(df): continue
+            row = df.iloc[i]
+            
+            # Oversold: RSI < 30 + close near/lower BB
+            if row["rsi"] < 30 and row["close"] <= row["bb_mid"]:
+                price = row["close"]
+                atr = max(row["atr"], 0.0004)
+                sl = price - atr * 1.8
+                tp = row["bb_mid"] + atr * 0.5
+                conf = min(83, 65 + (30 - row["rsi"]) * 1.0)
+                return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "MeanRev", "reason": f"RSI {row['rsi']:.0f} oversold"}
+            
+            # Overbought: RSI > 70 + close near/above BB
+            if row["rsi"] > 70 and row["close"] >= row["bb_mid"]:
+                price = row["close"]
+                atr = max(row["atr"], 0.0004)
+                sl = price + atr * 1.8
+                tp = row["bb_mid"] - atr * 0.5
+                conf = min(83, 65 + (row["rsi"] - 70) * 1.0)
+                return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "MeanRev", "reason": f"RSI {row['rsi']:.0f} overbought"}
         
         return None
 
 
 class BreakoutStrategy(Strategy):
-    """💥 Breakout — Price breaking recent ranges with volume surge."""
+    """💥 Breakout — Price breaking recent ranges with momentum confirmation."""
     name = "Breakout"
     
     @classmethod
@@ -591,39 +620,35 @@ class BreakoutStrategy(Strategy):
         
         last = df.iloc[-1]
         
-        # Recent range
-        recent = df.tail(20)
-        range_high = recent["high"].max()
-        range_low = recent["low"].min()
-        range_mid = (range_high + range_low) / 2
-        
-        # Breakout detection
-        vol_surge = last["volume"] > recent["volume"].mean() * 1.3
-        atr = max(last["atr"], 0.0005)
-        
-        # Upside breakout
-        if last["close"] > range_high and vol_surge:
-            price = last["close"]
-            sl = range_mid  # stop at range middle
-            tp = price + (range_high - range_low) * 0.8
-            conf = min(88, 65 + (15 if vol_surge else 0) + (10 if last["rsi"] > 50 else 0))
-            return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Breakout", "reason": "Range breakout UP + volume surge"}
-        
-        # Downside breakout
-        if last["close"] < range_low and vol_surge:
-            price = last["close"]
-            sl = range_mid
-            tp = price - (range_high - range_low) * 0.8
-            conf = min(88, 65 + (15 if vol_surge else 0) + (10 if last["rsi"] < 50 else 0))
-            return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
-                    "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
-                    "strategy": "Breakout", "reason": "Range breakout DOWN + volume surge"}
+        # Check multiple lookback windows for breakout
+        for lookback in [8, 12, 18]:
+            recent = df.tail(lookback)
+            range_high = recent["high"].max()
+            range_low = recent["low"].min()
+            range_mid = (range_high + range_low) / 2
+            vol_surge = last["volume"] > recent["volume"].mean() * 1.1
+            
+            if last["close"] > range_high and last["rsi"] > 50:
+                price = last["close"]
+                atr = max(last["atr"], 0.0005)
+                sl = range_mid
+                tp = price + (range_high - range_low) * 0.7
+                conf = min(86, 60 + (15 if vol_surge else 5) + (10 if last["rsi"] > 55 else 0))
+                return {"action": "BUY", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "Breakout", "reason": f"BU breakout ({lookback}b)"}
+            
+            if last["close"] < range_low and last["rsi"] < 50:
+                price = last["close"]
+                atr = max(last["atr"], 0.0005)
+                sl = range_mid
+                tp = price - (range_high - range_low) * 0.7
+                conf = min(86, 60 + (15 if vol_surge else 5) + (10 if last["rsi"] < 45 else 0))
+                return {"action": "SELL", "symbol": symbol, "price": round(price, 5),
+                        "sl": round(sl, 5), "tp": round(tp, 5), "confidence": round(conf, 1),
+                        "strategy": "Breakout", "reason": f"BD breakout ({lookback}b)"}
         
         return None
-
-
 class TradingEngine:
     """Main trading engine — runs strategies and executes demo trades."""
     
