@@ -1,0 +1,57 @@
+
+=======================================================
+  🤖 Gold Eagle 🦅 (@GoldEagle_Zentechxbot)
+  📢 Channel: @zenfxctc
+  🎫 10 trades per subscription
+  🧪 Demo: ON
+  💹 Strategies: Candy, Scalp, Trend, MeanRev, Breakout
+  📡 Interval: 30s
+=======================================================
+
+18:35:54 | INFO | 🚀 Trading engine started
+18:35:55 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:35:55 | INFO | 🏓 Health server on port 8080
+18:36:25 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:36:25 | WARNING | ⏳ Network issue (retry in 1s): HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8880839845:AAGz-T2UL_6F94pbMcN1RpUCaGpY33zQmrI/getUpdates (Caused by NewConnectionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable"))
+18:36:38 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:36:55 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:37:01 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:37:26 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:37:41 | WARNING | ⏳ Network issue (retry in 1s): HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8880839845:AAGz-T2UL_6F94pbMcN1RpUCaGpY33zQmrI/getUpdates (Caused by NewConnectionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable"))
+18:37:56 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:38:12 | WARNING | ⏳ Network issue (retry in 2s): HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8880839845:AAGz-T2UL_6F94pbMcN1RpUCaGpY33zQmrI/getUpdates (Caused by NewConnectionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable"))
+18:38:25 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:38:26 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:41:29 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:41:30 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:45:17 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:45:28 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:45:48 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:45:49 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:46:11 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:46:18 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:46:32 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:47:13 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:47:24 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:53:25 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:53:36 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+18:53:55 | INFO | 🔔 Best signal: Auto BUY EURUSD @ 1.085 (conf: 68.0%)
+18:54:16 | WARNING | ⏳ Network issue (retry in 1s): HTTPSConnectionPool(host='api.telegram.org', port=443): Max retries exceeded with url: /bot8880839845:AAGz-T2UL_6F94pbMcN1RpUCaGpY33zQmrI/getUpdates (Caused by NewConnectionError("HTTPSConnection(host='api.telegram.org', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable"))
+18:54:25 | INFO | 🔔 Best signal: Auto SELL EURUSD @ 1.085 (conf: 68.0%)
+18:54:28 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+
+=======================================================
+  🤖 Gold Eagle 🦅 (@GoldEagle_Zentechxbot)
+  📢 Channel: @zenfxctc
+  🎫 10 trades per subscription
+  🧪 Demo: ON
+  💹 Strategies: Candy, Scalp, Trend, MeanRev, Breakout
+  📡 Interval: 30s
+=======================================================
+
+19:57:01 | INFO | 🚀 Trading engine started
+19:57:02 | INFO | 🔔 Best signal: MeanRev BUY EURUSD @ 1.06559 (conf: 70.5%)
+19:57:02 | INFO | 🏓 Health server on port 8080
+19:57:14 | WARNING | ⚠️ 409 Conflict - another bot instance running?
+19:57:32 | INFO | 🔔 Best signal: Trend BUY USDJPY @ 152.53857 (conf: 64.6%)
+19:57:35 | WARNING | ⚠️ 409 Conflict - another bot instance running?
