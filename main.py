@@ -291,7 +291,7 @@ class MarketGenerator:
     def get_rates(cls, symbol, count=100):
         """OHLC data with consistent, tradeable patterns."""
         # Cache for 30 seconds to ensure consistency within a trade request
-        cache_key = f"{symbol}:{int(time.time() // 30)}"
+        cache_key = f"{symbol}:{count}:{int(time.time() // 30)}"
         if cache_key in cls._rate_cache:
             return cls._rate_cache[cache_key]
         
