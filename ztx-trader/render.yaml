@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: ztx-trader
+    env: node
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 5000
