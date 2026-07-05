@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZTX Trader — Sure Entry Signals</title>
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Inter', -apple-system, sans-serif; background: #0b0e11; color: #e0e0e0; min-height: 100vh; }
+header { background: #1a1d23; border-bottom: 1px solid #2b2f36; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+header h1 { font-size: 22px; font-weight: 700; color: #00c853; display: flex; align-items: center; gap: 10px; }
+header h1 span { color: #fff; font-weight: 300; }
+header .status { font-size: 12px; color: #888; }
+.container { display: flex; gap: 16px; padding: 16px; max-width: 1600px; margin: 0 auto; }
+.chart-panel { flex: 1; min-width: 0; }
+.signals-panel { width: 380px; flex-shrink: 0; }
+.chart-container { background: #13161c; border-radius: 8px; border: 1px solid #2b2f36; padding: 12px; height: 500px; }
+#chart { width: 100%; height: 100%; }
+.symbol-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.symbol-tab { padding: 6px 16px; background: #1a1d23; border: 1px solid #2b2f36; border-radius: 6px; cursor: pointer; font-size: 13px; color: #aaa; transition: all .15s; }
+.symbol-tab.active { background: #00c853; color: #000; border-color: #00c853; font-weight: 600; }
+.symbol-tab:hover { border-color: #00c853; }
+.signals-panel h2 { font-size: 16px; margin-bottom: 12px; color: #ccc; display: flex; justify-content: space-between; align-items: center; }
+.signals-panel h2 span { font-size: 12px; color: #666; font-weight: 400; }
+.signal-card { background: #1a1d23; border: 1px solid #2b2f36; border-radius: 8px; padding: 12px; margin-bottom: 8px; transition: all .15s; }
+.signal-card:hover { border-color: #444; }
+.signal-card .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.signal-card .symbol { font-weight: 600; font-size: 14px; }
+.signal-card .badge { padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+.badge.buy { background: #00c85322; color: #00c853; border: 1px solid #00c85344; }
+.badge.sell { background: #ff174422; color: #ff1744; border: 1px solid #ff174444; }
+.signal-card .details { font-size: 12px; color: #888; display: flex; gap: 12px; }
+.signal-card .details span { display: flex; align-items: center; gap: 4px; }
+.signal-card .time { font-size: 11px; color: #555; margin-top: 6px; }
+.no-signals { text-align: center; padding: 40px 20px; color: #555; font-size: 13px; }
+.no-signals .icon { font-size: 40px; margin-bottom: 10px; }
+.loading { text-align: center; padding: 40px; color: #555; }
+.markets-bar { display: flex; gap: 12px; padding: 10px 16px; background: #13161c; border-top: 1px solid #2b2f36; overflow-x: auto; font-size: 12px; }
+.market-item { display: flex; gap: 8px; align-items: center; padding: 4px 10px; border-radius: 4px; background: #1a1d23; white-space: nowrap; }
+.market-item .price { color: #fff; font-weight: 500; }
+.market-item .change { font-weight: 500; }
+.market-item .change.up { color: #00c853; }
+.market-item .change.down { color: #ff1744; }
+@media (max-width: 900px) { .container { flex-direction: column; } .signals-panel { width: 100%; } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⚡ ZTX <span>Trader</span></h1>
+  <div class="status">
+    <span id="signalCount">0</span> signals · 
+    <span id="apiStatus">connecting...</span>
+  </div>
+</header>
+
+<div class="markets-bar" id="marketsBar"></div>
+
+<div class="container">
+  <div class="chart-panel">
+    <div class="symbol-tabs" id="symbolTabs"></div>
+    <div class="chart-container">
+      <div id="chart"></div>
+    </div>
+  </div>
+  
+  <div class="signals-panel">
+    <h2>📡 Live Signals <span id="signalTimer"></span></h2>
+    <div id="signalList">
+      <div class="loading">Loading signals...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Pine Script Indicator (displayed as code) -->
+<div style="max-width:1600px; margin:0 auto; padding:0 16px 40px;">
+  <details style="background:#13161c; border:1px solid #2b2f36; border-radius:8px; padding:16px;">
+    <summary style="cursor:pointer; font-weight:600; color:#888; font-size:13px;">📜 ZTX Pine Script Indicator</summary>
+    <pre style="margin-top:12px; padding:16px; background:#0b0e11; border-radius:6px; overflow-x:auto; font-size:12px; line-height:1.6; color:#aaa;" id="pineCode"></pre>
+  </details>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let currentSymbol = 'BTCUSDT';
+let chart = null;
+let candleSeries = null;
+let signalMarkers = [];
+let refreshInterval = null;
+
+const SYMBOLS = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'EURUSD', 'GBPUSD', 'XAUUSD'];
+
+// ── Init Chart ─────────────────────────────────────────
+function initChart() {
+  chart = LightweightCharts.createChart(document.getElementById('chart'), {
+    layout: { background: { color: '#13161c' }, textColor: '#888' },
+    grid: { vertLines: { color: '#1e2229' }, horzLines: { color: '#1e2229' } },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+    timeScale: { borderColor: '#2b2f36', timeVisible: true },
+    rightPriceScale: { borderColor: '#2b2f36' }
+  });
+  candleSeries = chart.addCandlestickSeries({
+    upColor: '#00c853', downColor: '#ff1744',
+    borderUpColor: '#00c853', borderDownColor: '#ff1744',
+    wickUpColor: '#00c853', wickDownColor: '#ff1744'
+  });
+  chart.subscribeCrosshairMove(param => {
+    if (!param.time || !param.seriesData?.size) return;
+    const data = param.seriesData.get(candleSeries);
+    if (data) updatePriceDisplay(data);
+  });
+}
+
+// ── Load Chart Data ──────────────────────────────────
+async function loadChart(symbol) {
+  currentSymbol = symbol;
+  document.querySelectorAll('.symbol-tab').forEach(t => t.classList.toggle('active', t.dataset.symbol === symbol));
+  
+  try {
+    const interval = symbol.includes('USDT') ? '1h' : '1d';
+    const res = await fetch(`/api/chart/${symbol.replace('USDT', '')}?interval=${interval}`);
+    const data = await res.json();
+    
+    if (Array.isArray(data) && data.length > 0) {
+      candleSeries.setData(data);
+      chart.timeScale().fitContent();
+    }
+  } catch (e) {
+    console.error('Chart load error:', e);
+  }
+}
+
+// ── Load Signals ─────────────────────────────────────
+async function loadSignals() {
+  try {
+    const res = await fetch('/api/signals?limit=30');
+    const signals = await res.json();
+    
+    if (!Array.isArray(signals)) return;
+    
+    document.getElementById('signalCount').textContent = signals.length;
+    
+    const list = document.getElementById('signalList');
+    if (signals.length === 0) {
+      list.innerHTML = '<div class="no-signals"><div class="icon">📡</div>No signals yet<br><span style="font-size:11px;">Signals appear when TradingView alerts fire</span></div>';
+      return;
+    }
+    
+    list.innerHTML = signals.slice(0, 20).map(s => {
+      const dir = s.action === 'BUY' || s.condition === 'Bullish Entry';
+      const badge = dir ? 'buy' : 'sell';
+      const label = dir ? 'BUY' : 'SELL';
+      const ts = new Date(s.time || s.createdAt).toLocaleString();
+      return `
+        <div class="signal-card">
+          <div class="top">
+            <span class="symbol">${s.symbol || '?'}</span>
+            <span class="badge ${badge}">${label}</span>
+          </div>
+          <div class="details">
+            <span>💵 $${parseFloat(s.price || 0).toFixed(2)}</span>
+            ${s.sl ? `<span>🛑 $${s.sl.toFixed(2)}</span>` : ''}
+            ${s.tp ? `<span>🎯 $${s.tp.toFixed(2)}</span>` : ''}
+            ${s.strategy ? `<span>📊 ${s.strategy}</span>` : ''}
+          </div>
+          <div class="time">${ts}</div>
+        </div>
+      `;
+    }).join('');
+    
+    document.getElementById('apiStatus').textContent = 'live';
+    document.getElementById('apiStatus').style.color = '#00c853';
+  } catch (e) {
+    document.getElementById('apiStatus').textContent = 'offline';
+    document.getElementById('apiStatus').style.color = '#ff1744';
+  }
+}
+
+// ── Markets Bar ──────────────────────────────────────
+async function loadMarkets() {
+  const bar = document.getElementById('marketsBar');
+  try {
+    const res = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbols=' + JSON.stringify(SYMBOLS.filter(s => s.includes('USDT')).map(s => s)));
+    const data = await res.json();
+    bar.innerHTML = data.map(t => {
+      const change = parseFloat(t.priceChangePercent);
+      const cls = change >= 0 ? 'up' : 'down';
+      return `<div class="market-item"><span>${t.symbol.replace('USDT', '')}</span><span class="price">$${parseFloat(t.lastPrice).toFixed(2)}</span><span class="change ${cls}">${change >= 0 ? '+' : ''}${change.toFixed(2)}%</span></div>`;
+    }).join('');
+  } catch (e) {
+    bar.innerHTML = '<div class="market-item" style="color:#555;">Markets loading...</div>';
+  }
+}
+
+// ── Symbol Tabs ──────────────────────────────────────
+function renderTabs() {
+  const tabs = document.getElementById('symbolTabs');
+  tabs.innerHTML = SYMBOLS.map(s => 
+    `<div class="symbol-tab ${s === currentSymbol ? 'active' : ''}" data-symbol="${s}" onclick="switchSymbol('${s}')">${s}</div>`
+  ).join('');
+}
+
+function switchSymbol(symbol) {
+  currentSymbol = symbol;
+  loadChart(symbol);
+}
+
+// ── Init ──────────────────────────────────────────────
+initChart();
+renderTabs();
+loadChart(currentSymbol);
+loadSignals();
+loadMarkets();
+setInterval(loadSignals, 5000);
+setInterval(loadMarkets, 30000);
+
+// Load Pine Script code
+fetch('/indicator.pine')
+  .then(r => r.text())
+  .then(code => document.getElementById('pineCode').textContent = code)
+  .catch(() => {});
+
+</script>
+</body>
+</html>

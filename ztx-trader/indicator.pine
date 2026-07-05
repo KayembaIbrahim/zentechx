@@ -1,0 +1,52 @@
+//@version=5
+indicator("ZTX Sure Entry Signals", overlay=true)
+
+// ── Inputs ──────────────────────────────────────────────
+smaFast  = input.int(50,  "Fast SMA")
+smaSlow  = input.int(200, "Slow SMA")
+rsiLen   = input.int(14,  "RSI Length")
+rsiOB    = input.int(70,  "RSI Overbought")
+rsiOS    = input.int(30,  "RSI Oversold")
+atrMult  = input.float(1.5, "ATR Multiplier", step=0.1)
+
+// ── Calculations ────────────────────────────────────────
+smaFastVal = ta.sma(close, smaFast)
+smaSlowVal = ta.sma(close, smaSlow)
+rsi        = ta.rsi(close, rsiLen)
+atr        = ta.atr(14)
+
+// ── Entry Signals ──────────────────────────────────────
+// Bullish: Fast SMA crosses above Slow SMA + RSI not overbought
+bullCross = ta.crossover(smaFastVal, smaSlowVal) and rsi < rsiOB
+// Bearish: Fast SMA crosses below Slow SMA + RSI not oversold  
+bearCross = ta.crossunder(smaFastVal, smaSlowVal) and rsi > rsiOS
+
+// ── Confirmed Entries ──────────────────────────────────
+buySignal  = bullCross
+sellSignal = bearCross
+
+// ── SL/TP Levels ───────────────────────────────────────
+buySl  = close - atr * atrMult
+buyTp  = close + atr * atrMult * 2
+sellSl = close + atr * atrMult
+sellTp = close - atr * atrMult * 2
+
+// ── Webhook Alerts ─────────────────────────────────────
+alertcondition(buySignal,  title="ZTX BUY",  
+  message='{"action":"BUY","symbol":"{{ticker}}","price":{{close}},"sl":' + str.tostring(buySl) + ',"tp":' + str.tostring(buyTp) + ',"exchange":"{{exchange}}","timeframe":"{{interval}}"}')
+alertcondition(sellSignal, title="ZTX SELL", 
+  message='{"action":"SELL","symbol":"{{ticker}}","price":{{close}},"sl":' + str.tostring(sellSl) + ',"tp":' + str.tostring(sellTp) + ',"exchange":"{{exchange}}","timeframe":"{{interval}}"}')
+
+// ── Visuals ─────────────────────────────────────────────
+plot(smaFastVal, "Fast SMA", color.blue)
+plot(smaSlowVal, "Slow SMA", color.red)
+hline(rsiOB, "Overbought", color.red, hline.style_dashed)
+hline(rsiOS, "Oversold",  color.green, hline.style_dashed)
+
+plotshape(buySignal,  style=shape.triangleup,   location=location.belowbar, color=color.lime,   size=size.small)
+plotshape(sellSignal, style=shape.triangledown, location=location.abovebar, color=color.maroon, size=size.small)
+
+// ── RSI Panel ──────────────────────────────────────────
+hline(50, "Mid", color.gray, hline.style_dotted)
+rsiPlot = plot(rsi, "RSI", color.purple)
+fill(plot(rsiOB), plot(rsiOS), color=color.new(color.purple, 90))

@@ -1,0 +1,15 @@
+[
+  {
+    "symbol": "BTCUSDT",
+    "exchange": "CRYPTO",
+    "timeframe": "D",
+    "price": 62450,
+    "action": "BUY",
+    "strategy": "SMA Crossover",
+    "confidence": 82,
+    "sl": 61000,
+    "tp": 65000,
+    "time": "2026-07-05T13:26:15.208Z",
+    "id": "mr7tr7vu62mj"
+  }
+]
