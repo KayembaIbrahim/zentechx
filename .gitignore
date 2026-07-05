@@ -23,3 +23,5 @@ setup.sh
 README.md
 railway_bot.tar.gz
 main.py.bak
+node_modules/
+signals.json
